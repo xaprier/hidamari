@@ -493,3 +493,63 @@ class ConfigUtil:
             logs.append("--------------------------")
             logs_str = "\n".join(logs)
             logger.debug(f"[Config] Saved {CONFIG_PATH}\n{logs_str}")
+
+class PlaylistUtil:
+    def generate_template(self):
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        self.save(PLAYLIST_TEMPLATE)
+        
+    @staticmethod
+    def _check(playlist: dict):
+        """Check if the playlist is valid"""
+        is_all_keys_match = all(key in playlist for key in PLAYLIST_TEMPLATE)
+        is_version_match = playlist.get("version") == PLAYLIST_VERSION
+        return is_all_keys_match and is_version_match
+
+    def _invalid(self):
+        logger.debug(f"[Playlist] Invalid. A new playlist will be generated.")
+        self.generate_template()
+        return PLAYLIST_TEMPLATE
+
+    def load(self):
+        if os.path.isfile(PLAYLIST_PATH):
+            with open(PLAYLIST_PATH, "r") as f:
+                json_str = f.read()
+                try:
+                    playlist = json.loads(json_str)
+                    if self._check(playlist):
+                        logs = []
+                        logs.append("--------- Playlist ---------")
+                        logs.append(pformat(playlist, indent=3))
+                        logs.append("--------------------------")
+                        logs_str = "\n".join(logs)
+                        logger.debug(
+                            f"[Playlist] Loaded {PLAYLIST_PATH}\n{logs_str}")
+                        return playlist
+                except json.decoder.JSONDecodeError:
+                    logger.debug(f"[Playlist] JSONDecodeError")
+        return self._invalid()
+
+    def save(self, playlist):
+        old_playlist = None
+        if os.path.isfile(PLAYLIST_PATH):
+            with open(PLAYLIST_PATH, "r") as f:
+                json_str = f.read()
+                try:
+                    old_playlist = json.loads(json_str)
+                    if not self._check(old_playlist):
+                        old_playlist = None
+                except json.decoder.JSONDecodeError:
+                    old_playlist = None
+        # Skip if the config is identical
+        if old_playlist == playlist:
+            return
+        with open(PLAYLIST_PATH, "w") as f:
+            json_str = json.dumps(playlist, indent=3)
+            print(json_str, file=f)
+            logs = []
+            logs.append("--------- Playlist ---------")
+            logs.append(pformat(playlist, indent=3))
+            logs.append("--------------------------")
+            logs_str = "\n".join(logs)
+            logger.debug(f"[Config] Saved {CONFIG_PATH}\n{logs_str}")

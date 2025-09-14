@@ -42,11 +42,15 @@ X-Flatpak=io.github.jeffshee.Hidamari
 
 CONFIG_DIR = os.path.join(xdg_config_home, "hidamari")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+PLAYLIST_PATH = os.path.join(CONFIG_DIR, "playlist.json")
+
+PLAYLIST_VERSION = 1
 
 MODE_NULL = "MODE_NULL"
 MODE_VIDEO = "MODE_VIDEO"
 MODE_STREAM = "MODE_STREAM"
 MODE_WEBPAGE = "MODE_WEBPAGE"
+MODE_PLAYLIST = "MODE_PLAYLIST"
 
 CONFIG_VERSION = 4
 CONFIG_KEY_VERSION = "version"
@@ -76,6 +80,13 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_FADE_INTERVAL: 0.1,
     CONFIG_KEY_SYSTRAY: False,
     CONFIG_KEY_FIRST_TIME: True,
+}
+
+PLAYLIST_TEMPLATE = {
+    "version": 1,
+    "playlists": {
+        
+    }
 }
 
 try:

@@ -18,6 +18,7 @@ try:
     from gui.web_view import WebView
     from gui.local_video_view import LocalVideoView
     from gui.streaming_view import StreamingView
+    from gui.playlist_view import PlaylistView
     from gui.popover_main import PopoverMain
     from commons import *
     from monitor import *
@@ -29,6 +30,7 @@ except ModuleNotFoundError:
     from hidamari.gui.web_view import WebView
     from hidamari.gui.streaming_view import StreamingView
     from hidamari.gui.local_video_view import LocalVideoView
+    from hidamari.gui.playlist_view import PlaylistView
     from hidamari.gui.popover_main import PopoverMain
     from hidamari.gui.gui_utils import debounce
     from hidamari.utils import (
@@ -82,7 +84,8 @@ class ControlPanel(Gtk.Application):
         self.web_placeholder = self.builder.get_object("WebViewPlaceholder")
         self.streaming_placeholder = self.builder.get_object("StreamingViewPlaceholder")
         self.localvideo_placeholder = self.builder.get_object("LocalVideoPlaceholder")
-        
+        self.playlist_placeholder = self.builder.get_object("PlaylistViewPlaceholder")
+
         # Load web view UI
         self.web_view = WebView(self.config, self.server)
         self._add_to_placeholder(self.web_placeholder, self.web_view.widget)
@@ -94,6 +97,10 @@ class ControlPanel(Gtk.Application):
         # Load streaming UI
         self.streaming_view = StreamingView(self.config, self.server)
         self._add_to_placeholder(self.streaming_placeholder, self.streaming_view.widget)
+        
+        # Load playlist UI
+        self.playlist_view = PlaylistView(self.config, self.server)
+        self._add_to_placeholder(self.playlist_placeholder, self.playlist_view.widget)
 
         # Load popover UI
         self.popover_main = PopoverMain(self.config, self.server)
