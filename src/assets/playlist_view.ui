@@ -142,14 +142,13 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkButton">
+                  <object class="GtkButton" id="ButtonReloadVideos">
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>
                     <property name="receives-default">True</property>
                     <property name="tooltip-text" translatable="yes">Refresh</property>
                     <property name="halign">center</property>
                     <property name="valign">center</property>
-                    <property name="action-name">app.local_video_refresh</property>
                     <property name="always-show-image">True</property>
                     <child>
                       <object class="GtkImage" id="image2">

@@ -11,8 +11,10 @@ import pydbus
 
 try:
     from commons import *
+    from monitor import *
 except ModuleNotFoundError:
     from hidamari.commons import *
+    from hidamari.monitor import *
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -445,7 +447,15 @@ class ConfigUtil:
                     config['data_source']['Default'] = value
                     self.save(config)
                     break
-                    
+                
+    def _migrateV4ToV5(self, config: dict):
+        logger.debug(f"[Config] Migration from version 4 to 5.")
+        config['active_playlist'] = None
+        config['version'] = 5
+        # save config file
+        self.save(config)
+        return config
+
     def load(self):
         if os.path.isfile(CONFIG_PATH):
             with open(CONFIG_PATH, "r") as f:
@@ -455,6 +465,11 @@ class ConfigUtil:
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)
+                        
+                    # migration to version 5 for adding new key
+                    if config.get("version") <= 4 and CONFIG_VERSION >= 5:
+                        config = self._migrateV4ToV5(config)
+
                     self._checkDefaultSource(config)
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)
                     if self._check(config):
@@ -509,7 +524,22 @@ class PlaylistUtil:
     def _invalid(self):
         logger.debug(f"[Playlist] Invalid. A new playlist will be generated.")
         self.generate_template()
-        return PLAYLIST_TEMPLATE
+        playlist = PLAYLIST_TEMPLATE
+        playlist = self._load_monitors(playlist) # ensure monitors are loaded
+        return playlist
+    
+    def _load_monitors(self, playlist: dict):
+        monitors = Monitors()
+        monitor_names = monitors.get_monitors()
+
+        for pl_name, pl_monitors in playlist.get("playlists", {}).items():
+            for monitor in monitor_names:
+                if monitor not in pl_monitors:
+                    logger.info(f"[Playlist] Adding missing monitor '{monitor}' to playlist '{pl_name}'.")
+                    pl_monitors[monitor] = []
+
+        self.save(playlist)
+        return playlist
 
     def load(self):
         if os.path.isfile(PLAYLIST_PATH):
@@ -517,6 +547,7 @@ class PlaylistUtil:
                 json_str = f.read()
                 try:
                     playlist = json.loads(json_str)
+                    self._load_monitors(playlist) # add missing monitors to playlists if exists
                     if self._check(playlist):
                         logs = []
                         logs.append("--------- Playlist ---------")

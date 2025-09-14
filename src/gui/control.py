@@ -278,6 +278,7 @@ class ControlPanel(Gtk.Application):
 
     def _reload_all_widgets(self):
         self.local_video.reload_icon_view()
+        self.playlist_view.reload_icon_view()
         self.popover_main.set_mute_toggle_icon()
         self.popover_main.set_scale_volume_sensitive()
         self.popover_main.set_spin_blur_radius_sensitive()

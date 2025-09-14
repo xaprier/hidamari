@@ -110,6 +110,7 @@ class HidamariServer(object):
         ConfigUtil().save(self.config)
 
     def _setup_player(self, mode, data_source=None, monitor=None):
+        # todo: implement playlist mode
         """Setup and run player"""
         logger.info(f"[Mode] {mode}")
         self.config[CONFIG_KEY_MODE] = mode
@@ -158,6 +159,9 @@ class HidamariServer(object):
         if player:
             player.quit_player()
 
+    def playlist(self, playlist_name=None):
+        self._setup_player(MODE_PLAYLIST, playlist_name)
+    
     def video(self, video_path=None, monitor=None):
         self._setup_player(MODE_VIDEO, video_path, monitor)
 
@@ -182,6 +186,8 @@ class HidamariServer(object):
     def reload(self):
         if self.config[CONFIG_KEY_MODE] == MODE_VIDEO:
             self.video()
+        elif self.config[CONFIG_KEY_MODE] == MODE_PLAYLIST:
+            self.playlist()
         elif self.config[CONFIG_KEY_MODE] == MODE_STREAM:
             self.stream()
         elif self.config[CONFIG_KEY_MODE] == MODE_WEBPAGE:
