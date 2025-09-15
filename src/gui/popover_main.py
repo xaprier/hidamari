@@ -45,9 +45,6 @@ class PopoverMain:
         if self.server is not None:
             self.server.blur_radius = self.config[CONFIG_KEY_BLUR_RADIUS]
         
-    def on_popover_main_activate(self):
-        print("PopoverMain activated")
-        
     def set_mute_toggle_icon(self):
         toggle_icon: Gtk.Image = self.builder.get_object("ToggleMuteIcon")
         volume, is_mute = self.config[CONFIG_KEY_VOLUME], self.config[CONFIG_KEY_MUTE]

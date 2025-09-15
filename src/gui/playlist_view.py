@@ -88,15 +88,14 @@ class PlaylistView:
         Button Callbacks
     """
     def on_reload_icon_view(self, button: Gtk.Button):
-        print("Reload videos button clicked")
+        logger.info(f"[GUI/PlaylistView] Reloading videos")
         self.reload_icon_view()
 
     def on_add_or_save_playlist(self, button: Gtk.Button):
-        print("Add or save playlist button clicked")
         # check if playlist name empty
         playlist_name = self.playlist_name_entry.get_text()
         if not playlist_name:
-            print("Playlist name is empty")
+            logger.warning(f"[GUI/PlaylistView] Playlist name is empty")
             button.set_sensitive(False)
             # show translateable error dialog
             dialog = Gtk.MessageDialog(
@@ -112,18 +111,17 @@ class PlaylistView:
             return
         
         # if all good, add/save playlist to listbox
-        print(f"Adding/Saving playlist: {playlist_name}\n{self.current_playlist}")
+        logger.info(f"[GUI/PlaylistView] Adding/Saving playlist: {playlist_name}")
         self.playlists[playlist_name] = self.current_playlist if self.current_playlist else {}
         
         self._save_playlist()
         self._load_playlist()
 
     def on_add_to_playlist(self, button: Gtk.Button):
-        print("Add to playlist button clicked")
         # get monitor name
         monitor_name = self.monitor_combobox.get_active_text()
         if not monitor_name:
-            print("No monitor selected")
+            logger.warning(f"[GUI/PlaylistView] No monitor selected")
             return
         
         if self.current_playlist is None:
@@ -133,27 +131,23 @@ class PlaylistView:
             self.current_playlist[monitor_name] = []
             
         selected_items = self.videos_view.get_selected_items()
-        print(selected_items)
         for item in selected_items:
-            print(item.get_indices()[0])
             video_path = self.video_paths[item.get_indices()[0]]
             if video_path not in self.current_playlist[monitor_name]:
                 self.current_playlist[monitor_name].append(video_path)
 
         if not selected_items:
-            print("No videos selected to add")
+            logger.warning(f"[GUI/PlaylistView] No videos selected to add")
             return
 
         self._update_playlist_view(monitor_name)
         self._update_disable_status_for_buttons()
     
-    def on_remove_from_playlist(self, button: Gtk.Button):
-        print("Remove from playlist button clicked")
-        
+    def on_remove_from_playlist(self, button: Gtk.Button):        
         # check if any item selected on playlist_icon_view
         selected_items = self.playlist_icon_view.get_selected_items()
         if not selected_items:
-            print("No videos selected to remove")
+            logger.warning(f"[GUI/PlaylistView] No videos selected to remove")
             button.set_sensitive(False)
             dialog = Gtk.MessageDialog(
                 transient_for=self.widget.get_toplevel(),
@@ -170,15 +164,14 @@ class PlaylistView:
         # get monitor name
         monitor_name = self.monitor_combobox.get_active_text()
         if not monitor_name:
-            print("No monitor selected")
+            logger.warning(f"[GUI/PlaylistView] No monitor selected")
             return
         
         if self.current_playlist is None or monitor_name not in self.current_playlist:
-            print("No current playlist or monitor in playlist")
+            logger.warning(f"[GUI/PlaylistView] No current playlist or monitor in playlist")
             return
         
         for item in selected_items:
-            print(item.get_indices()[0])
             video_path = self.current_playlist[monitor_name][item.get_indices()[0]]
             if video_path in self.current_playlist[monitor_name]:
                 self.current_playlist[monitor_name].remove(video_path)
@@ -187,12 +180,10 @@ class PlaylistView:
         self._update_disable_status_for_buttons()
             
     def on_move_left(self, button: Gtk.Button):
-        print("Move left button clicked")
-        
         # check if any item selected on playlist_icon_view
         selected_items = self.playlist_icon_view.get_selected_items()
         if not selected_items:
-            print("No videos selected to move")
+            logger.warning(f"[GUI/PlaylistView] No videos selected to move")
             button.set_sensitive(False)
             dialog = Gtk.MessageDialog(
                 transient_for=self.widget.get_toplevel(),
@@ -209,18 +200,18 @@ class PlaylistView:
         # get monitor name
         monitor_name = self.monitor_combobox.get_active_text()
         if not monitor_name:
-            print("No monitor selected")
+            logger.warning(f"[GUI/PlaylistView] No monitor selected")
             return
         
         if self.current_playlist is None or monitor_name not in self.current_playlist:
-            print("No current playlist or monitor in playlist")
+            logger.warning(f"[GUI/PlaylistView] No current playlist or monitor in playlist")
             return
         
         playlist = self.current_playlist[monitor_name]
 
         # change order of selected items
         indices = [item.get_indices()[0] for item in selected_items]
-        print(f"Selected indices to move left: {indices}")
+        logger.info(f"[GUI/PlaylistView] Selected indices to move left: {indices}")
 
         # left shift: move from the start to avoid index shifting issues
         for index in sorted(indices):
@@ -231,12 +222,10 @@ class PlaylistView:
         self._update_disable_status_for_buttons()
     
     def on_move_right(self, button: Gtk.Button):
-        print("Move right button clicked")
-        
         # check if any item selected on playlist_icon_view
         selected_items = self.playlist_icon_view.get_selected_items()
         if not selected_items:
-            print("No videos selected to move")
+            logger.warning(f"[GUI/PlaylistView] No videos selected to move")
             button.set_sensitive(False)
             dialog = Gtk.MessageDialog(
                 transient_for=self.widget.get_toplevel(),
@@ -253,11 +242,11 @@ class PlaylistView:
         # get monitor name
         monitor_name = self.monitor_combobox.get_active_text()
         if not monitor_name:
-            print("No monitor selected")
+            logger.warning(f"[GUI/PlaylistView] No monitor selected")
             return
         
         if self.current_playlist is None or monitor_name not in self.current_playlist:
-            print("No current playlist or monitor in playlist")
+            logger.warning(f"[GUI/PlaylistView] No current playlist or monitor in playlist")
             return
         
         # change order of selected items
@@ -265,7 +254,7 @@ class PlaylistView:
 
         # change order of selected items
         indices = [item.get_indices()[0] for item in selected_items]
-        print(f"Selected indices to move right: {indices}")
+        logger.info(f"[GUI/PlaylistView] Selected indices to move right: {indices}")
 
         # move from the end to avoid index shifting issues
         for index in sorted(indices, reverse=True):
@@ -276,11 +265,10 @@ class PlaylistView:
         self._update_disable_status_for_buttons()
 
     def on_playlist_apply(self, button: Gtk.Button):
-        print("Apply playlist button clicked")
         # get playlist name
         selected_playlist = self.playlist_listbox.get_selected_row()
         if not selected_playlist:
-            print("No playlist selected to apply")
+            logger.warning(f"[GUI/PlaylistView] No playlist selected to apply")
             button.set_sensitive(False)
             dialog = Gtk.MessageDialog(
                 transient_for=self.widget.get_toplevel(),
@@ -296,13 +284,13 @@ class PlaylistView:
 
         playlist_name = selected_playlist.get_child().get_text()
         if playlist_name not in self.playlists:
-            print(f"Playlist {playlist_name} not found in playlists")
+            logger.warning(f"[GUI/PlaylistView] Playlist {playlist_name} not found in playlists")
             return
         
         self.config[CONFIG_KEY_MODE] = MODE_PLAYLIST
         self.config[CONFIG_KEY_ACTIVE_PLAYLIST] = playlist_name
         self._save_config()
-        print(f"Applying playlist: {playlist_name}")
+        logger.info(f"[GUI/PlaylistView] Applying playlist: {playlist_name}")
         if self.server is not None:
             self.server.playlist(playlist_name)
 
@@ -311,11 +299,10 @@ class PlaylistView:
     """
     
     def on_playlist_name_changed(self, entry: Gtk.Entry):
-        print(f"Playlist name changed: {entry.get_text()}")
         self._update_disable_status_for_buttons()
 
     def on_playlist_changed(self, listbox: Gtk.ListBox, row: Gtk.ListBoxRow):
-        print(f"Playlist changed: {row.get_child().get_label()}")
+        logger.info(f"[GUI/PlaylistView] Playlist changed: {row.get_child().get_label()}")
         self._update_disable_status_for_buttons()
         # set active monitor
         self.monitor_combobox.set_active(0)
@@ -326,19 +313,19 @@ class PlaylistView:
         selected_items = []
         for item in icon_view.get_selected_items():
             selected_items.append(item.get_indices()[0])
-        print(f"Video selection changed: {selected_items}")
+        logger.info(f"[GUI/PlaylistView] Video selection changed: {selected_items}")
         self._update_disable_status_for_buttons()
 
     def on_video_selection_changed_in_playlist(self, icon_view: Gtk.IconView):
         selected_items = []
         for item in icon_view.get_selected_items():
             selected_items.append(item.get_indices()[0])
-        print(f"Video selection changed in playlist: {selected_items}")
+        logger.info(f"[GUI/PlaylistView] Video selection changed in playlist: {selected_items}")
         self._update_disable_status_for_buttons()
 
     def on_monitor_changed(self, combo: Gtk.ComboBoxText):
         active_monitor = combo.get_active_text()
-        print(f"Monitor changed to: {active_monitor}")
+        logger.info(f"[GUI/PlaylistView] Monitor changed to: {active_monitor}")
         self._update_playlist_view(active_monitor)
         
     def reload_icon_view(self, *_):
@@ -357,7 +344,6 @@ class PlaylistView:
             thread.start()
 
     def _update_disable_status_for_buttons(self):
-        print("Updating disable status for buttons")
         # if no playlist selected, disable apply button
         selected_playlist = self.playlist_listbox.get_selected_row()
         self.apply_button.set_sensitive(selected_playlist is not None)
@@ -378,11 +364,11 @@ class PlaylistView:
 
     def _update_playlist_view(self, monitor_name: str):
         if not monitor_name or monitor_name not in self.monitors.get_monitors():
-            print(f"Monitor {monitor_name} not found")
+            logger.warning(f"[GUI/PlaylistView] Monitor {monitor_name} not found")
             return
         
         if self.current_playlist is None:
-            print("No current playlist to update")
+            logger.warning(f"[GUI/PlaylistView] No current playlist to update")
             return
         
         if monitor_name not in self.current_playlist:
@@ -403,7 +389,7 @@ class PlaylistView:
             thread.daemon = True
             thread.start()
 
-        print(f"Updating playlist view for monitor: {monitor_name}")
+        logger.info(f"[GUI/PlaylistView] Updating playlist view for monitor: {monitor_name}")
 
     def _load_playlist(self):
         self.playlists = PlaylistUtil().load()["playlists"]
@@ -413,7 +399,6 @@ class PlaylistView:
             # clear listbox then add playlists
             self.playlist_listbox.foreach(lambda row: self.playlist_listbox.remove(row))  # Clear existing rows
             for playlist in self.playlists.keys():
-                print(f"Adding playlist: {playlist}")
                 row = Gtk.ListBoxRow()
                 label = Gtk.Label(label=playlist, xalign=0)
                 row.add(label)

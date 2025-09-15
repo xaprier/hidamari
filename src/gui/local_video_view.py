@@ -30,7 +30,6 @@ class LocalVideoView:
         self.widget = self.builder.get_object("LocalVideoView")
 
         self.builder.connect_signals({
-            "on_local_video_activate": self.on_local_video_activate
         })
         
         # initialize monitors
@@ -49,9 +48,6 @@ class LocalVideoView:
         self.video_paths = None
 
         self._setup_context_menu() # setup context menu for selecting monitors
-
-    def on_local_video_activate(self):
-        print("Local video activated")
 
     def reload_icon_view(self, *_):
         self.video_paths = get_video_paths()

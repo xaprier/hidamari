@@ -184,8 +184,6 @@ class PlayerWindow(Gtk.ApplicationWindow):
             self.__vlc_widget.player.set_media(*args)
             
     def set_playlist(self, paths):
-        print(f"[Playlist] Setting playlist with {len(paths)} items")
-        print(paths)
         if self.mode == MODE_PLAYLIST:
             self.__vlc_widget.media_list.release()
             self.__vlc_widget.media_list = self.__vlc_widget.instance.media_list_new()
@@ -432,7 +430,12 @@ class VideoPlayer(BasePlayer):
                     window.centercrop(video_width[monitor.get_model()], video_height[monitor.get_model()])
         elif self.mode == MODE_PLAYLIST:
             self.reload_playlist()
-            playlist = self.playlist["playlists"].get(self.config[CONFIG_KEY_ACTIVE_PLAYLIST], {})
+            playlist_name = self.config[CONFIG_KEY_ACTIVE_PLAYLIST]
+            playlist = self.playlist["playlists"].get(playlist_name, {})
+            
+            logger.info(f"[Playlist] Active playlist: {playlist_name}")
+            logger.info(f"[Playlist] Loaded playlist: {playlist}")
+            
             for (monitor, window) in self.windows.items():
                 sources = playlist[monitor.get_model()] \
                     if monitor.get_model() in playlist and len(playlist[monitor.get_model()]) != 0 \
