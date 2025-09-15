@@ -39,6 +39,9 @@ class HidamariServer(object):
             <arg type='s' name='video_path' direction='in'/>
             <arg type='s' name='monitor' direction='in'/>
         </method>
+        <method name='playlist'>
+            <arg type='s' name='playlist_name' direction='in'/>
+        </method>
         <method name='stream'>
             <arg type='s' name='stream_url' direction='in'/>
         </method>
@@ -113,13 +116,20 @@ class HidamariServer(object):
         # todo: implement playlist mode
         """Setup and run player"""
         logger.info(f"[Mode] {mode}")
+        logger.info(f"[Data Source] {data_source}")
+        logger.info(f"[Monitor] {monitor}")
         self.config[CONFIG_KEY_MODE] = mode
 
         # Set data source if specified
-        if data_source and monitor:
+        if data_source and monitor and mode == MODE_VIDEO:
             self.config[CONFIG_KEY_DATA_SOURCE][monitor] = data_source
-        self.config[CONFIG_KEY_DATA_SOURCE]['Default'] = data_source # always update default source
 
+        if mode == MODE_VIDEO:
+            self.config[CONFIG_KEY_DATA_SOURCE]['Default'] = data_source # always update default source
+            
+        if mode == MODE_PLAYLIST:
+            self.config[CONFIG_KEY_ACTIVE_PLAYLIST] = data_source
+            
         # Quit current then create a new player
         self._quit_player()
 
@@ -128,7 +138,7 @@ class HidamariServer(object):
             self.player_process.terminate()
             self.player_process = None
 
-        if mode in [MODE_VIDEO, MODE_STREAM]:
+        if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             self.player_process = Process(
                 name=f"hidamari-player-{self._player_count}", target=video_player_main)
         elif mode == MODE_WEBPAGE:

@@ -22,13 +22,13 @@ try:
     from player.base_player import BasePlayer
     from menu import build_menu
     from commons import *
-    from utils import ActiveHandler, ConfigUtil, is_gnome, is_wayland, is_nvidia_proprietary, is_vdpau_ok, is_flatpak
+    from utils import ActiveHandler, ConfigUtil, PlaylistUtil, is_gnome, is_wayland, is_nvidia_proprietary, is_vdpau_ok, is_flatpak
     from yt_utils import get_formats, get_best_audio, get_optimal_video
 except ModuleNotFoundError:
     from hidamari.player.base_player import BasePlayer
     from hidamari.menu import build_menu
     from hidamari.commons import *
-    from hidamari.utils import ActiveHandler, ConfigUtil, is_gnome, is_wayland, is_nvidia_proprietary, is_vdpau_ok, is_flatpak
+    from hidamari.utils import ActiveHandler, ConfigUtil, PlaylistUtil, is_gnome, is_wayland, is_nvidia_proprietary, is_vdpau_ok, is_flatpak
     from hidamari.yt_utils import get_formats, get_best_audio, get_optimal_video
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -86,7 +86,15 @@ class VLCWidget(Gtk.DrawingArea):
         # --no-disable-screensaver: Allow screensaver.
         vlc_options = ["--no-disable-screensaver"]
         self.instance = vlc.Instance(vlc_options)
+        
+        # normal player
         self.player = self.instance.media_player_new()
+        
+        # playlist player
+        self.media_list = self.instance.media_list_new()
+        self.list_player = self.instance.media_list_player_new()
+        self.list_player.set_media_list(self.media_list)
+        self.list_player.set_media_player(self.player)
 
         def handle_embed(*args):
             self.player.set_xwindow(self.get_window().get_xid())
@@ -98,12 +106,14 @@ class VLCWidget(Gtk.DrawingArea):
 
 
 class PlayerWindow(Gtk.ApplicationWindow):
-    def __init__(self, name, width, height, *args, **kwargs):
+    def __init__(self, name, width, height, mode=MODE_VIDEO, *args, **kwargs):
         super(PlayerWindow, self).__init__(*args, **kwargs)
         # Setup a VLC widget given the provided width and height.
         self.width = width
         self.height = height
         self.name = name
+        self.mode = mode
+        
         self.__vlc_widget = VLCWidget(width, height)
         self.add(self.__vlc_widget)
         self.__vlc_widget.show()
@@ -120,7 +130,10 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.connect("button-press-event", self._on_button_press_event)
 
     def play(self):
-        self.__vlc_widget.player.play()
+        if self.mode == MODE_PLAYLIST:
+            self.__vlc_widget.list_player.play()
+        else:
+            self.__vlc_widget.player.play()
 
     def play_fade(self, target, fade_duration_sec, fade_interval):
         self.play()
@@ -131,11 +144,17 @@ class PlayerWindow(Gtk.ApplicationWindow):
                         fade_interval=fade_interval, update_callback=self.set_volume)
 
     def is_playing(self):
+        if self.mode == MODE_PLAYLIST:
+            return self.__vlc_widget.list_player.is_playing()
+        
         return self.__vlc_widget.player.is_playing()
 
     def pause(self):
-        if self.is_playing():
-            self.__vlc_widget.player.pause()
+        if self.mode == MODE_PLAYLIST and self.is_playing():
+            self.__vlc_widget.list_player.pause()
+        else:
+            if self.is_playing():
+                self.__vlc_widget.player.pause()
 
     def pause_fade(self, fade_duration_sec, fade_interval):
         cur = self.get_volume()
@@ -155,7 +174,30 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.__vlc_widget.instance.media_new(*args)
 
     def set_media(self, *args):
-        self.__vlc_widget.player.set_media(*args)
+        if self.mode == MODE_PLAYLIST:
+            # playlist modunda tek video set etmek gerekirse listeyi sıfırla
+            self.__vlc_widget.media_list.release()
+            self.__vlc_widget.media_list = self.__vlc_widget.instance.media_list_new()
+            self.__vlc_widget.list_player.set_media_list(self.__vlc_widget.media_list)
+            self.__vlc_widget.media_list.add_media(*args)
+        else:
+            self.__vlc_widget.player.set_media(*args)
+            
+    def set_playlist(self, paths):
+        print(f"[Playlist] Setting playlist with {len(paths)} items")
+        print(paths)
+        if self.mode == MODE_PLAYLIST:
+            self.__vlc_widget.media_list.release()
+            self.__vlc_widget.media_list = self.__vlc_widget.instance.media_list_new()
+            medias = []
+            for path in paths:
+                media = self.__vlc_widget.instance.media_new(path)
+                self.__vlc_widget.media_list.add_media(media)
+                medias.append(media)
+            self.__vlc_widget.list_player.set_media_list(self.__vlc_widget.media_list)
+            self.__vlc_widget.list_player.set_playback_mode(vlc.PlaybackMode.loop)
+            return medias
+        return []
 
     def set_volume(self, *args):
         self.__vlc_widget.player.audio_set_volume(*args)
@@ -257,7 +299,9 @@ class VideoPlayer(BasePlayer):
                     break
 
         self.config = None
+        self.playlist = None
         self.reload_config()
+        self.reload_playlist()
 
         # Static wallpaper (currently for GNOME only)
         if is_gnome():
@@ -341,6 +385,10 @@ class VideoPlayer(BasePlayer):
     @data_source.setter
     def data_source(self, data_source):
         self.config[CONFIG_KEY_DATA_SOURCE] = data_source
+        
+        # update mode for window
+        for window in self.windows.values():
+            window.mode = self.mode
 
         if self.mode == MODE_VIDEO:
             # Get the dimension of the video
@@ -380,8 +428,26 @@ class VideoPlayer(BasePlayer):
                 window.set_position(0.0)
                 if monitor.get_model() not in data_source or len(data_source[monitor.get_model()]) == 0:
                     window.centercrop(video_width['Default'], video_height['Default'])
-                else:                
+                else:
                     window.centercrop(video_width[monitor.get_model()], video_height[monitor.get_model()])
+        elif self.mode == MODE_PLAYLIST:
+            self.reload_playlist()
+            playlist = self.playlist["playlists"].get(self.config[CONFIG_KEY_ACTIVE_PLAYLIST], {})
+            for (monitor, window) in self.windows.items():
+                sources = playlist[monitor.get_model()] \
+                    if monitor.get_model() in playlist and len(playlist[monitor.get_model()]) != 0 \
+                    else data_source['Default']
+                    
+                medias = window.set_playlist(sources)
+                """
+                This loops the media itself. Using -R / --repeat and/or -L / --loop don't seem to work. However,
+                based on reading, this probably only repeats 65535 times, which is still a lot of time, but might
+                cause the program to stop playback if it's left on for a very long time.
+                """
+                for media in medias:
+                    # Prevent awful ear-rape with multiple instances.
+                    if not monitor.is_primary():
+                        media.add_option("no-audio")
 
         elif self.mode == MODE_STREAM:
             source = data_source['Default']
@@ -541,6 +607,9 @@ class VideoPlayer(BasePlayer):
 
     def reload_config(self):
         self.config = ConfigUtil().load()
+        
+    def reload_playlist(self):
+        self.playlist = PlaylistUtil().load()
 
     def quit_player(self):
         self.set_original_wallpaper()

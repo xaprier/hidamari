@@ -94,7 +94,7 @@ class PlaylistView:
     def on_add_or_save_playlist(self, button: Gtk.Button):
         print("Add or save playlist button clicked")
         # check if playlist name empty
-        playlist_name = self.playlist_name_entry.get_text().strip()
+        playlist_name = self.playlist_name_entry.get_text()
         if not playlist_name:
             print("Playlist name is empty")
             button.set_sensitive(False)
@@ -111,12 +111,12 @@ class PlaylistView:
             dialog.destroy()
             return
         
-        # if all good, add playlist to listbox
+        # if all good, add/save playlist to listbox
+        print(f"Adding/Saving playlist: {playlist_name}\n{self.current_playlist}")
         self.playlists[playlist_name] = self.current_playlist if self.current_playlist else {}
         
-        print("Playlists after adding new one:")
-        print(self.playlists)
         self._save_playlist()
+        self._load_playlist()
 
     def on_add_to_playlist(self, button: Gtk.Button):
         print("Add to playlist button clicked")
@@ -299,6 +299,7 @@ class PlaylistView:
             print(f"Playlist {playlist_name} not found in playlists")
             return
         
+        self.config[CONFIG_KEY_MODE] = MODE_PLAYLIST
         self.config[CONFIG_KEY_ACTIVE_PLAYLIST] = playlist_name
         self._save_config()
         print(f"Applying playlist: {playlist_name}")
@@ -409,16 +410,25 @@ class PlaylistView:
         
         # set first playlist as current
         if self.playlists:
-            first_playlist_name = list(self.playlists.keys())[0] # first version
-            self.current_playlist = self.playlists[first_playlist_name]
-            self.playlist_name_entry.set_text(first_playlist_name)
-            # add items to listbox
+            # clear listbox then add playlists
             self.playlist_listbox.foreach(lambda row: self.playlist_listbox.remove(row))  # Clear existing rows
             for playlist in self.playlists.keys():
+                print(f"Adding playlist: {playlist}")
                 row = Gtk.ListBoxRow()
                 label = Gtk.Label(label=playlist, xalign=0)
                 row.add(label)
                 self.playlist_listbox.add(row)
+                
+            # set first playlist as active
+            self.playlist_listbox.show_all()
+            first_row = self.playlist_listbox.get_row_at_index(0)
+            if first_row:
+                self.playlist_listbox.select_row(first_row)
+                self.playlist_name_entry.set_text(first_row.get_child().get_text())
+                self.current_playlist = self.playlists[first_row.get_child().get_text()]
+                # update playlist view for active monitor
+                self.monitor_combobox.set_active(0)
+                self._update_playlist_view(self.monitor_combobox.get_active_text())
         else:
             self.current_playlist = {}
             for monitor in self.monitors.get_monitors():
