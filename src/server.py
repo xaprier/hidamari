@@ -11,20 +11,22 @@ from pydbus import SessionBus
 
 try:
     from commons import *
-    from player.video_player import main as video_player_main
-    from player.web_player import main as web_player_main
-    from gui.control import main as gui_main
-    from menu import show_systray_icon
     from monitor import *
     from utils import ConfigUtil, EndSessionHandler, get_video_paths
 except ModuleNotFoundError:
     from hidamari.commons import *
-    from hidamari.player.video_player import main as video_player_main
-    from hidamari.player.web_player import main as web_player_main
-    from hidamari.gui.control import main as gui_main
-    from hidamari.menu import show_systray_icon
     from hidamari.utils import ConfigUtil, EndSessionHandler, get_video_paths
     from hidamari.monitor import *
+
+# NOTE: `gui.control`, `player.video_player`, `player.web_player` and `menu` all import
+# GTK/GLib at module level. `multiprocessing`'s forkserver start method preloads this
+# `__main__` module into its persistent helper process *before* forking any children.
+# If GTK gets imported during that preload, the forkserver helper ends up with GTK's
+# internal worker thread(s) initialized, and every child forked from it afterward
+# inherits a broken thread state where synchronous D-Bus calls (e.g. `SessionBus().get()`)
+# hang forever. Keep these imports local to the functions that build each Process's
+# target, so GTK is only ever imported inside the already-forked child, never in the
+# forkserver's preloaded state.
 
 loop = GLib.MainLoop()
 logger = logging.getLogger(LOGGER_NAME)
@@ -78,9 +80,15 @@ class HidamariServer(object):
         self._player_count = 0
 
         # Processes
-        # Switch to `forkserver` since v3.2 for performance. BTW `fork` didn't work (it crashes).
-        # Ref: https://bnikolic.co.uk/blog/python/parallelism/2019/11/13/python-forkserver-preload.html
-        mp.set_start_method("forkserver")
+        # `fork` crashes (GTK/GLib state doesn't survive a raw fork). `forkserver` was tried
+        # next, but on this GTK/GLib/D-Bus-heavy app it proved unreliable in practice: its
+        # persistent helper process inherits whatever module-level GTK state got preloaded
+        # into `__main__`, which can leave every child it forks afterward with a broken
+        # GLib/D-Bus thread state (synchronous D-Bus calls hang forever); separately, forking
+        # the GUI process right after the player process from that same helper has been
+        # observed to make the GUI process exit silently with no window and no error. `spawn`
+        # avoids both: each child is a fresh interpreter with no inherited GTK/thread state.
+        mp.set_start_method("spawn")
         self.gui_process = None
         self.sys_icon_process = None
         self.player_process = None
@@ -139,9 +147,17 @@ class HidamariServer(object):
             self.player_process = None
 
         if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+            try:
+                from player.video_player import main as video_player_main
+            except ModuleNotFoundError:
+                from hidamari.player.video_player import main as video_player_main
             self.player_process = Process(
                 name=f"hidamari-player-{self._player_count}", target=video_player_main)
         elif mode == MODE_WEBPAGE:
+            try:
+                from player.web_player import main as web_player_main
+            except ModuleNotFoundError:
+                from hidamari.player.web_player import main as web_player_main
             self.player_process = Process(
                 name=f"hidamari-player-{self._player_count}", target=web_player_main)
         elif mode == MODE_NULL:
@@ -157,6 +173,10 @@ class HidamariServer(object):
             if self._prev_mode != self.mode:
                 if self.sys_icon_process:
                     self.sys_icon_process.terminate()
+                try:
+                    from menu import show_systray_icon
+                except ModuleNotFoundError:
+                    from hidamari.menu import show_systray_icon
                 self.sys_icon_process = Process(
                     name="hidamari-systray", target=show_systray_icon, args=(mode,))
                 self.sys_icon_process.start()
@@ -224,6 +244,10 @@ class HidamariServer(object):
 
     def show_gui(self):
         """Show main GUI"""
+        try:
+            from gui.control import main as gui_main
+        except ModuleNotFoundError:
+            from hidamari.gui.control import main as gui_main
         self.gui_process = Process(name="hidamari-gui", target=gui_main, args=(
             self.version, self.pkgdatadir, self.localedir,))
         self.gui_process.start()

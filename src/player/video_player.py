@@ -278,10 +278,12 @@ class VideoPlayer(BasePlayer):
     """
 
     def __init__(self, *args, **kwargs):
-        super(VideoPlayer, self).__init__(*args, **kwargs)
-
-        # We need to initialize X11 threads so we can use hardware decoding.
-        # `libX11.so.6` fix for Fedora 33
+        # XInitThreads() must run before the process's first X11 connection, or Xlib's
+        # internal state is never made thread-safe and concurrent Xlib/xcb calls (GTK's
+        # main thread alongside libVLC's decode/output threads) corrupt the connection,
+        # crashing with `Assertion '!xcb_xlib_threads_sequence_lost' failed`. super().__init__()
+        # below (BasePlayer -> Gdk.Display.get_default()) opens that connection, so this
+        # has to happen first.
         x11 = None
         if is_wayland() and is_nvidia_proprietary() and not is_vdpau_ok():
             logger.warning(
@@ -295,6 +297,8 @@ class VideoPlayer(BasePlayer):
                 if x11 is not None:
                     x11.XInitThreads()
                     break
+
+        super(VideoPlayer, self).__init__(*args, **kwargs)
 
         self.config = None
         self.playlist = None

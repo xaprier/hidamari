@@ -4,8 +4,7 @@ import subprocess
 from pprint import pformat
 
 import gi
-gi.require_version("Wnck", "3.0")
-from gi.repository import Gio, GLib, Wnck  # , Gdk
+from gi.repository import Gio, GLib  # , Gdk
 
 import pydbus
 
@@ -263,6 +262,15 @@ class WindowHandler:
     """
 
     def __init__(self, on_window_state_changed: callable):
+        # Imported lazily: loading the Wnck typelib initializes fork-unsafe state, and
+        # utils.py is imported by server.py, which is preloaded into multiprocessing's
+        # forkserver helper. If Wnck were imported at module level here, every process
+        # forked afterward (GUI, player, ...) would hang on its first synchronous D-Bus
+        # call. Keep it local to the one class that actually needs it.
+        gi.require_version("Wnck", "3.0")
+        from gi.repository import Wnck
+        self._Wnck = Wnck
+
         self.on_window_state_changed = on_window_state_changed
         self.screen = Wnck.Screen.get_default()
         self.screen.force_update()
@@ -281,6 +289,7 @@ class WindowHandler:
 
     def eval(self, *args):
         # TODO: #28 (Wallpaper stops animating on other monitor when app maximized on other)
+        Wnck = self._Wnck
         is_changed = False
 
         is_any_maximized, is_any_fullscreen = False, False
