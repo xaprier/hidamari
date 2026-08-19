@@ -6,7 +6,7 @@ import gi
 import pydbus
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib, GdkPixbuf, Gdk, Gio
+from gi.repository import Gtk, GLib, GdkPixbuf, Gdk, Gio, Pango
 
 # Custom DnD target used to drag a video from the library IconView and drop it
 # onto the playlist area; distinct from IconView's own internal "GTK_TREE_MODEL_ROW"
@@ -598,11 +598,25 @@ class PlaylistView:
             self._update_disable_status_for_buttons()
         drag_context.finish(True, False, time)
 
+    def _ellipsize_item_labels(self, icon_view: Gtk.IconView):
+        """
+        Force item labels to a single, ellipsized line. The default IconView text
+        renderer wraps long filenames onto a second line, which makes items (and
+        thus a height-locked, non-scrolling IconView like the playlist queue)
+        change height depending on which filenames happen to be showing.
+        """
+        for cell in icon_view.get_cells():
+            if isinstance(cell, Gtk.CellRendererText):
+                cell.set_property("wrap-width", -1)
+                cell.set_property("ellipsize", Pango.EllipsizeMode.END)
+                cell.set_property("alignment", Pango.Alignment.CENTER)
+
     def reload_icon_view(self, *_):
         self.video_paths = get_video_paths()
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
         self.videos_view.set_pixbuf_column(0)
         self.videos_view.set_text_column(1)
+        self._ellipsize_item_labels(self.videos_view)
         self.videos_view.set_model(list_store)
         for idx, video_path in enumerate(self.video_paths):
             pixbuf = Gtk.IconTheme().get_default().load_icon("video-x-generic", 96, 0)
@@ -685,6 +699,7 @@ class PlaylistView:
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str)
         self.playlist_icon_view.set_pixbuf_column(0)
         self.playlist_icon_view.set_text_column(1)
+        self._ellipsize_item_labels(self.playlist_icon_view)
         self.playlist_icon_view.set_model(list_store)
         self.playlist_icon_view.set_reorderable(True)
         # Force everything onto a single row: fix column count to (at least) the
