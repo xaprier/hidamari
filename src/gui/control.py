@@ -63,7 +63,7 @@ class ControlPanel(Gtk.Application):
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "control.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./assets/control.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/assets/control.ui"))
 
         # Handlers declared in `control.ui`
         signals = {

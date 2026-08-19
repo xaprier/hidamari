@@ -18,7 +18,7 @@ class WebView:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "web_view.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./assets/web_view.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/assets/web_view.ui"))
 
         self.widget = self.builder.get_object("WebView")
 
