@@ -107,6 +107,17 @@ class ControlPanel(Gtk.Application):
         popoverButton = self.builder.get_object("popoverButton")
         popoverButton.set_popover(self.popover_main.widget)
 
+        # Open on whichever tab matches the currently active mode, instead of
+        # always defaulting to the stack's first ("Local Video") page.
+        stack_child_name = {
+            MODE_VIDEO: "video",
+            MODE_STREAM: "stream",
+            MODE_WEBPAGE: "webpage",
+            MODE_PLAYLIST: "playlist",
+        }.get(self.config[CONFIG_KEY_MODE])
+        if stack_child_name:
+            self.builder.get_object("stack1").set_visible_child_name(stack_child_name)
+
     def _add_to_placeholder(self, placeholder, widget):
         parent = widget.get_parent()
         if parent:
