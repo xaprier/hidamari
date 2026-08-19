@@ -86,6 +86,7 @@ class PlaylistView:
         # connect signals
         self.monitor_combobox.connect("changed", self.on_monitor_changed)
         self.playlist_listbox.connect("row-activated", self.on_playlist_changed)
+        self.playlist_listbox.connect("button-press-event", self.on_playlist_listbox_button_press)
         self.videos_view.connect("selection-changed", self.on_video_selection_changed)
         self.apply_button.connect("clicked", self.on_playlist_apply)
         self.add_to_playlist_button.connect("clicked", self.on_add_to_playlist)
@@ -360,6 +361,35 @@ class PlaylistView:
         self._save_playlist(playlist_name)
         self._load_playlist()
 
+    def on_new_playlist(self, *_):
+        if self._is_dirty() and not self._confirm_discard_changes():
+            return
+        logger.info(f"[GUI/PlaylistView] Starting new playlist draft")
+        self.playlist_listbox.unselect_all()
+        self._reset_to_new_draft()
+
+    def on_playlist_listbox_button_press(self, listbox: Gtk.ListBox, event: Gdk.EventButton):
+        row = listbox.get_row_at_y(int(event.y))
+        if row is not None:
+            return False
+        if event.button == 3:
+            menu = self._build_playlist_context_menu(row)
+            menu.popup_at_pointer(event)
+            return True
+        elif event.button == 1:
+            # clicking empty space below the rows: same as "New" - clear the selection/draft
+            self.on_new_playlist()
+            return True
+        return False
+
+    def _build_playlist_context_menu(self, row):
+        menu = Gtk.Menu()
+        new_item = Gtk.MenuItem(label="New")
+        new_item.connect("activate", lambda _: self.on_new_playlist())
+        menu.append(new_item)
+        menu.show_all()
+        return menu
+
     def on_playlist_apply(self, button: Gtk.Button):
         # get playlist name
         selected_playlist = self.playlist_listbox.get_selected_row()
@@ -436,7 +466,8 @@ class PlaylistView:
             text="Discard unsaved changes?",
         )
         dialog.format_secondary_text(
-            f"'{self.current_playlist_name}' has unsaved changes. Switching playlists will discard them.")
+            f"'{self.current_playlist_name or 'Untitled'}' has unsaved changes. "
+            f"Switching playlists will discard them.")
         response = dialog.run()
         dialog.destroy()
         return response == Gtk.ResponseType.YES
@@ -786,6 +817,18 @@ class PlaylistView:
         row.add(box)
         return row
 
+    def _reset_to_new_draft(self):
+        """Clear the editor to a blank, unsaved playlist draft (no listbox row selected)."""
+        self.current_playlist_name = None
+        self.playlist_name_entry.set_text("")
+        self.current_playlist = self._new_playlist_data()
+        self.saved_snapshot = copy.deepcopy(self.current_playlist)
+        self._sync_distribution_mode_ui()
+        self._update_disable_status_for_buttons()
+        monitor_name = self.monitor_combobox.get_active_text()
+        self._update_playlist_view(monitor_name)
+        self.playlist_name_entry.grab_focus()
+
     def _load_playlist(self, select_name=None):
         self.playlists = PlaylistUtil().load()["playlists"]
 
@@ -813,10 +856,7 @@ class PlaylistView:
                 self.playlist_listbox.select_row(target_row)
                 self._select_playlist(target_row.playlist_name)
         else:
-            self.current_playlist_name = None
-            self.current_playlist = self._new_playlist_data()
-            self.saved_snapshot = copy.deepcopy(self.current_playlist)
-            self._sync_distribution_mode_ui()
+            self._reset_to_new_draft()
 
     def _save_playlist(self, playlist_name=None):
         original = PlaylistUtil().load()
