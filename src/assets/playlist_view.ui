@@ -4,16 +4,19 @@
   <requires lib="gtk+" version="3.24"/>
   <object class="GtkPaned" id="PlaylistView">
     <property name="can-focus">False</property>
-    <property name="orientation">horizontal</property>
-
-    <!-- Left pane: Playlist list -->
+    <property name="wide-handle">True</property>
     <child>
       <object class="GtkBox">
         <property name="width-request">80</property>
         <property name="can-focus">False</property>
+        <property name="hexpand">False</property>
+        <property name="vexpand">False</property>
         <property name="orientation">vertical</property>
-        <property name="spacing">8</property>
-        <property name="margin">8</property>
+        <property name="spacing">12</property>
+        <property name="margin-start">12</property>
+        <property name="margin-end">12</property>
+        <property name="margin-top">12</property>
+        <property name="margin-bottom">12</property>
         <child>
           <object class="GtkLabel">
             <property name="can-focus">False</property>
@@ -33,8 +36,6 @@
           <object class="GtkListBox" id="ListBoxPlaylist">
             <property name="can-focus">False</property>
             <property name="vexpand">True</property>
-            <property name="selection-mode">single</property>
-            <!-- border -->
             <style>
               <class name="frame"/>
             </style>
@@ -46,12 +47,37 @@
           </packing>
         </child>
         <child>
-          <object class="GtkButton" id="ButtonApply">
-            <property name="label">Apply</property>
+          <object class="GtkBox">
             <property name="can-focus">False</property>
-            <property name="receives-default">False</property>
-            <property name="halign">center</property>
-            <property name="hexpand">True</property>
+            <property name="spacing">8</property>
+            <property name="homogeneous">True</property>
+            <child>
+              <object class="GtkButton" id="ButtonApply">
+                <property name="label">Apply</property>
+                <property name="can-focus">False</property>
+                <property name="receives-default">False</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="ButtonDeletePlaylist">
+                <property name="label">Delete</property>
+                <property name="can-focus">False</property>
+                <property name="receives-default">False</property>
+                <style>
+                  <class name="destructive-action"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -65,21 +91,21 @@
         <property name="shrink">True</property>
       </packing>
     </child>
-
-    <!-- Right pane: Playlist manager -->
     <child>
       <object class="GtkBox" id="PlaylistManager">
         <property name="can-focus">False</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
         <property name="orientation">vertical</property>
-        <property name="spacing">8</property>
-        <property name="margin">8</property>
-        <property name="spacing">8</property>
-
-        <!-- Top side: Name and add/save button -->
+        <property name="spacing">16</property>
+        <property name="margin-start">16</property>
+        <property name="margin-end">16</property>
+        <property name="margin-top">16</property>
+        <property name="margin-bottom">16</property>
         <child>
           <object class="GtkBox" id="PlayListNameBox">
             <property name="can-focus">False</property>
-            <property name="orientation">horizontal</property>
+            <property name="hexpand">False</property>
             <property name="spacing">12</property>
             <child>
               <object class="GtkEntry" id="EntryPlayListName">
@@ -108,20 +134,16 @@
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="padding">8</property>
             <property name="position">0</property>
           </packing>
         </child>
-
-        <!-- Middle side: Videos list and add button -->
         <child>
           <object class="GtkBox" id="VideosBox">
             <property name="can-focus">False</property>
-            <property name="orientation">vertical</property>
-            <property name="spacing">4</property>
+            <property name="hexpand">True</property>
             <property name="vexpand">True</property>
-
-            <!-- Label, refresh and open hidamari videos folder button -->
+            <property name="orientation">vertical</property>
+            <property name="spacing">8</property>
             <child>
               <object class="GtkBox">
                 <property name="visible">True</property>
@@ -197,8 +219,6 @@
                 <property name="position">0</property>
               </packing>
             </child>
-
-            <!-- view for videos -->
             <child>
               <object class="GtkScrolledWindow">
                 <property name="visible">True</property>
@@ -208,23 +228,20 @@
                   <object class="GtkIconView" id="IconViewVideos">
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>
+                    <property name="margin">0</property>
                     <property name="item-width">96</property>
                     <property name="row-spacing">8</property>
                     <property name="column-spacing">8</property>
                     <property name="item-padding">8</property>
-                    <property name="selection-mode">single</property>
                   </object>
                 </child>
               </object>
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
-                <property name="padding">8</property>
                 <property name="position">1</property>
               </packing>
             </child>
-
-            <!-- Add to playlist button -->
             <child>
               <object class="GtkButton" id="ButtonAddToPlaylist">
                 <property name="label">Add To Playlist</property>
@@ -237,23 +254,65 @@
                   <class name="suggested-action"/>
                 </style>
               </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">2</property>
+              </packing>
             </child>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">1</property>
+          </packing>
         </child>
-
-        <!-- Bottom side: Playlist controller -->
         <child>
           <object class="GtkBox">
             <property name="can-focus">False</property>
+            <property name="hexpand">True</property>
             <property name="orientation">vertical</property>
-            <property name="spacing">4</property>
+            <property name="spacing">8</property>
             <child>
-              <!-- Controllers like monitor selection, left right button etc. -->
+              <object class="GtkBox">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="spacing">8</property>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Distribution:</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="ComboBoxDistributionMode">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Per Monitor lets you assign a different playlist to each monitor. All (Equal Split) shares one playlist, split evenly across every monitor.</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
               <object class="GtkBox">
                 <property name="can-focus">False</property>
-                <property name="orientation">horizontal</property>
-                <property name="spacing">4</property>
-                <!-- Controller for monitor selection -->
+                <property name="spacing">8</property>
                 <child>
                   <object class="GtkComboBoxText" id="ComboBoxMonitor">
                     <property name="can-focus">True</property>
@@ -264,8 +323,6 @@
                     <property name="position">0</property>
                   </packing>
                 </child>
-
-                <!-- Controller for moving selected item to left -->
                 <child>
                   <object class="GtkButton" id="ButtonMoveLeft">
                     <property name="label">Move Left</property>
@@ -278,8 +335,6 @@
                     <property name="position">1</property>
                   </packing>
                 </child>
-
-                <!-- Controller for moving selected item to right -->
                 <child>
                   <object class="GtkButton" id="ButtonMoveRight">
                     <property name="label">Move Right</property>
@@ -292,8 +347,6 @@
                     <property name="position">2</property>
                   </packing>
                 </child>
-
-                <!-- Controller for removing selected item from playlist -->
                 <child>
                   <object class="GtkButton" id="ButtonRemoveFromPlaylist">
                     <property name="label">Remove From Playlist</property>
@@ -306,44 +359,50 @@
                     <property name="position">3</property>
                   </packing>
                 </child>
-
               </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
             </child>
-
-            <!-- view for playlist items -->
             <child>
-              <object class="GtkScrolledWindow">
+              <object class="GtkScrolledWindow" id="ScrolledWindowPlaylist">
+                <property name="height-request">150</property>
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
+                <property name="vscrollbar-policy">never</property>
                 <property name="shadow-type">in</property>
-                <property name="height-request">120</property>
                 <child>
                   <object class="GtkIconView" id="IconViewPlaylist">
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>
+                    <property name="margin">0</property>
                     <property name="item-width">96</property>
                     <property name="row-spacing">8</property>
                     <property name="column-spacing">8</property>
                     <property name="item-padding">8</property>
-                    <property name="selection-mode">single</property>
                   </object>
                 </child>
               </object>
               <packing>
-                <property name="expand">True</property>
+                <property name="expand">False</property>
                 <property name="fill">True</property>
-                <property name="padding">8</property>
-                <property name="position">1</property>
+                <property name="position">2</property>
               </packing>
             </child>
           </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">2</property>
+          </packing>
         </child>
       </object>
       <packing>
-        <property name="resize">False</property>
+        <property name="resize">True</property>
         <property name="shrink">False</property>
       </packing>
     </child>
-
   </object>
 </interface>
