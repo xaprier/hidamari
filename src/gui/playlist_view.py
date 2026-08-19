@@ -342,7 +342,9 @@ class PlaylistView:
             logger.warning(f"[GUI/PlaylistView] No playlist selected to delete")
             return
 
-        playlist_name = selected_playlist.playlist_name
+        self._delete_playlist(selected_playlist.playlist_name)
+
+    def _delete_playlist(self, playlist_name: str):
         dialog = Gtk.MessageDialog(
             transient_for=self.widget.get_toplevel(),
             flags=0,
@@ -370,25 +372,90 @@ class PlaylistView:
 
     def on_playlist_listbox_button_press(self, listbox: Gtk.ListBox, event: Gdk.EventButton):
         row = listbox.get_row_at_y(int(event.y))
-        if row is not None:
+        if row is None:
+            if event.button == 3:
+                menu = self._build_playlist_context_menu(None)
+                menu.popup_at_pointer(event)
+                return True
+            elif event.button == 1:
+                # clicking empty space below the rows: same as "New" - clear the selection/draft
+                self.on_new_playlist()
+                return True
             return False
         if event.button == 3:
             menu = self._build_playlist_context_menu(row)
             menu.popup_at_pointer(event)
             return True
-        elif event.button == 1:
-            # clicking empty space below the rows: same as "New" - clear the selection/draft
-            self.on_new_playlist()
-            return True
         return False
 
     def _build_playlist_context_menu(self, row):
         menu = Gtk.Menu()
-        new_item = Gtk.MenuItem(label="New")
-        new_item.connect("activate", lambda _: self.on_new_playlist())
-        menu.append(new_item)
+        if row is None:
+            new_item = Gtk.MenuItem(label="New")
+            new_item.connect("activate", lambda _: self.on_new_playlist())
+            menu.append(new_item)
+        else:
+            playlist_name = row.playlist_name
+
+            apply_item = Gtk.MenuItem(label="Apply")
+            apply_item.connect("activate", lambda _: self._apply_playlist(playlist_name))
+            menu.append(apply_item)
+
+            rename_item = Gtk.MenuItem(label="Rename")
+            rename_item.connect("activate", lambda _: self._rename_playlist_via_dialog(playlist_name))
+            menu.append(rename_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            delete_item = Gtk.MenuItem(label="Delete")
+            delete_item.connect("activate", lambda _: self._delete_playlist(playlist_name))
+            menu.append(delete_item)
         menu.show_all()
         return menu
+
+    def _rename_playlist_via_dialog(self, playlist_name: str):
+        dialog = Gtk.MessageDialog(
+            transient_for=self.widget.get_toplevel(),
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"Rename playlist '{playlist_name}'",
+        )
+        entry = Gtk.Entry()
+        entry.set_text(playlist_name)
+        entry.set_activates_default(True)
+        dialog.get_content_area().add(entry)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        dialog.show_all()
+        response = dialog.run()
+        new_name = entry.get_text().strip()
+        dialog.destroy()
+
+        if response != Gtk.ResponseType.OK or not new_name or new_name == playlist_name:
+            return
+
+        if new_name in self.playlists:
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.widget.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"A playlist named '{new_name}' already exists.",
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+            return
+
+        logger.info(f"[GUI/PlaylistView] Renaming playlist '{playlist_name}' to '{new_name}'")
+        self.playlists[new_name] = self.playlists.pop(playlist_name)
+        was_active_playlist = self.config.get(CONFIG_KEY_ACTIVE_PLAYLIST) == playlist_name
+        self._save_playlist(None)
+        if was_active_playlist:
+            self.config[CONFIG_KEY_ACTIVE_PLAYLIST] = new_name
+            self._save_config()
+            if self.server is not None:
+                self.server.playlist(new_name)  # live-reload under the new name
+        self._load_playlist(select_name=new_name)
 
     def on_playlist_apply(self, button: Gtk.Button):
         # get playlist name
@@ -408,11 +475,13 @@ class PlaylistView:
             dialog.destroy()
             return
 
-        playlist_name = selected_playlist.playlist_name
+        self._apply_playlist(selected_playlist.playlist_name)
+
+    def _apply_playlist(self, playlist_name: str):
         if playlist_name not in self.playlists:
             logger.warning(f"[GUI/PlaylistView] Playlist {playlist_name} not found in playlists")
             return
-        
+
         self.config[CONFIG_KEY_MODE] = MODE_PLAYLIST
         self.config[CONFIG_KEY_ACTIVE_PLAYLIST] = playlist_name
         self._save_config()
