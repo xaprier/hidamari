@@ -435,26 +435,52 @@ class VideoPlayer(BasePlayer):
         elif self.mode == MODE_PLAYLIST:
             self.reload_playlist()
             playlist_name = self.config[CONFIG_KEY_ACTIVE_PLAYLIST]
-            playlist = self.playlist["playlists"].get(playlist_name, {})
-            
-            logger.info(f"[Playlist] Active playlist: {playlist_name}")
-            logger.info(f"[Playlist] Loaded playlist: {playlist}")
-            
+            playlist_data = self.playlist["playlists"].get(playlist_name, {})
+            distribution_mode = playlist_data.get(PLAYLIST_KEY_MODE, PLAYLIST_MODE_PER_MONITOR)
+
+            logger.info(f"[Playlist] Active playlist: {playlist_name} ({distribution_mode})")
+            logger.info(f"[Playlist] Loaded playlist: {playlist_data}")
+
+            monitor_models = [monitor.get_model() for monitor in self.windows]
+            if distribution_mode == PLAYLIST_MODE_ALL:
+                # Split the shared video pool round-robin across every connected monitor.
+                per_monitor_sources = self._distribute_evenly(
+                    playlist_data.get(PLAYLIST_KEY_VIDEOS, []), monitor_models)
+            else:
+                per_monitor_sources = playlist_data.get(PLAYLIST_KEY_MONITORS, {})
+
             for (monitor, window) in self.windows.items():
-                sources = playlist[monitor.get_model()] \
-                    if monitor.get_model() in playlist and len(playlist[monitor.get_model()]) != 0 \
-                    else data_source['Default']
-                    
-                medias = window.set_playlist(sources)
-                """
-                This loops the media itself. Using -R / --repeat and/or -L / --loop don't seem to work. However,
-                based on reading, this probably only repeats 65535 times, which is still a lot of time, but might
-                cause the program to stop playback if it's left on for a very long time.
-                """
-                for media in medias:
-                    # Prevent awful ear-rape with multiple instances.
-                    if not monitor.is_primary():
-                        media.add_option("no-audio")
+                sources = per_monitor_sources.get(monitor.get_model()) or []
+                if sources:
+                    window.mode = MODE_PLAYLIST
+                    medias = window.set_playlist(sources)
+                    """
+                    This loops the media itself. Using -R / --repeat and/or -L / --loop don't seem to work. However,
+                    based on reading, this probably only repeats 65535 times, which is still a lot of time, but might
+                    cause the program to stop playback if it's left on for a very long time.
+                    """
+                    for media in medias:
+                        # Prevent awful ear-rape with multiple instances.
+                        if not monitor.is_primary():
+                            media.add_option("no-audio")
+                else:
+                    # Monitor has no playlist entries: downgrade to a single looping video,
+                    # falling back from this monitor's data_source to the Default one.
+                    fallback = data_source.get(monitor.get_model()) or data_source.get('Default')
+                    if fallback:
+                        logger.info(
+                            f"[Playlist] '{monitor.get_model()}' has no playlist, downgrading to single video: {fallback}")
+                        window.mode = MODE_VIDEO
+                        media = window.media_new(fallback)
+                        media.add_option("input-repeat=65535")
+                        if not monitor.is_primary():
+                            media.add_option("no-audio")
+                        window.set_media(media)
+                        window.set_position(0.0)
+                    else:
+                        logger.info(
+                            f"[Playlist] '{monitor.get_model()}' has no playlist and no fallback source, leaving blank")
+                        window.mode = MODE_NULL
 
         elif self.mode == MODE_STREAM:
             source = data_source['Default']
@@ -530,6 +556,16 @@ class VideoPlayer(BasePlayer):
             for monitor, window in self.windows.items():
                 window.play_fade(target=self.volume, fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
                             fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL])
+
+    @staticmethod
+    def _distribute_evenly(videos, monitor_models):
+        """Round-robin split a flat video list across the given monitor models."""
+        distributed = {model: [] for model in monitor_models}
+        if not monitor_models:
+            return distributed
+        for idx, video in enumerate(videos):
+            distributed[monitor_models[idx % len(monitor_models)]].append(video)
+        return distributed
 
     def monitor_sync(self):
         primary_monitor = None

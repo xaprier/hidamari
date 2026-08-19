@@ -44,7 +44,13 @@ CONFIG_DIR = os.path.join(xdg_config_home, "hidamari")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 PLAYLIST_PATH = os.path.join(CONFIG_DIR, "playlist.json")
 
-PLAYLIST_VERSION = 1
+PLAYLIST_VERSION = 2
+
+PLAYLIST_MODE_PER_MONITOR = "PER_MONITOR"
+PLAYLIST_MODE_ALL = "ALL"
+PLAYLIST_KEY_MODE = "mode"
+PLAYLIST_KEY_MONITORS = "monitors"
+PLAYLIST_KEY_VIDEOS = "videos"
 
 MODE_NULL = "MODE_NULL"
 MODE_VIDEO = "MODE_VIDEO"
@@ -85,9 +91,9 @@ CONFIG_TEMPLATE = {
 }
 
 PLAYLIST_TEMPLATE = {
-    "version": 1,
+    "version": PLAYLIST_VERSION,
     "playlists": {
-        
+
     }
 }
 

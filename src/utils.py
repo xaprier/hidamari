@@ -541,12 +541,35 @@ class PlaylistUtil:
         monitors = Monitors()
         monitor_names = monitors.get_monitors()
 
-        for pl_name, pl_monitors in playlist.get("playlists", {}).items():
+        for pl_name, pl_data in playlist.get("playlists", {}).items():
+            pl_data.setdefault(PLAYLIST_KEY_MODE, PLAYLIST_MODE_PER_MONITOR)
+            pl_data.setdefault(PLAYLIST_KEY_VIDEOS, [])
+            pl_monitors = pl_data.setdefault(PLAYLIST_KEY_MONITORS, {})
             for monitor in monitor_names:
                 if monitor not in pl_monitors:
                     logger.info(f"[Playlist] Adding missing monitor '{monitor}' to playlist '{pl_name}'.")
                     pl_monitors[monitor] = []
 
+        self.save(playlist)
+        return playlist
+
+    def _migrateV1ToV2(self, playlist: dict):
+        """
+        v1 stored each playlist as a flat {monitor: [videos]} dict. v2 wraps it with a
+        'mode' (PER_MONITOR/ALL) so a playlist can also be evenly distributed across all
+        monitors instead of manually assigned per monitor.
+        """
+        logger.debug(f"[Playlist] Migration from version 1 to 2.")
+        old_playlists = playlist.get("playlists", {})
+        new_playlists = {}
+        for name, pl_monitors in old_playlists.items():
+            new_playlists[name] = {
+                PLAYLIST_KEY_MODE: PLAYLIST_MODE_PER_MONITOR,
+                PLAYLIST_KEY_MONITORS: pl_monitors,
+                PLAYLIST_KEY_VIDEOS: [],
+            }
+        playlist["playlists"] = new_playlists
+        playlist["version"] = 2
         self.save(playlist)
         return playlist
 
@@ -556,6 +579,8 @@ class PlaylistUtil:
                 json_str = f.read()
                 try:
                     playlist = json.loads(json_str)
+                    if playlist.get("version", 1) <= 1 and PLAYLIST_VERSION >= 2:
+                        playlist = self._migrateV1ToV2(playlist)
                     self._load_monitors(playlist) # add missing monitors to playlists if exists
                     if self._check(playlist):
                         logs = []
