@@ -2,6 +2,7 @@ import sys
 import threading
 
 import gi
+import vlc
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, GdkPixbuf, Gdk
@@ -10,11 +11,11 @@ try:
     import os
     sys.path.insert(1, os.path.join(sys.path[0], ".."))
     from gui.imports import *
-    from gui.gui_utils import get_thumbnail
+    from gui.gui_utils import get_thumbnail, HoverPreview
     from utils import ConfigUtil
 except ModuleNotFoundError:
     from hidamari.gui.imports import *
-    from hidamari.gui.gui_utils import get_thumbnail
+    from hidamari.gui.gui_utils import get_thumbnail, HoverPreview
     from hidamari.utils import ConfigUtil
 
 class LocalVideoView:
@@ -25,7 +26,7 @@ class LocalVideoView:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "local_video_view.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./assets/local_video_view.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/assets/local_video_view.ui"))
 
         self.widget = self.builder.get_object("LocalVideoView")
 
@@ -44,19 +45,27 @@ class LocalVideoView:
                 self.monitors.get_monitor(monitor).set_wallpaper(video_paths['Default'])
                 
         self.all_key = "all"
-        self.icon_view = None
-        self.video_paths = None
+        self.video_paths = []
+
+        self.icon_view: Gtk.IconView = self.builder.get_object("IconView")
+        self.icon_view.connect("button-press-event", self.on_icon_view_button_press)
+        self.hover_preview = HoverPreview(
+            self.icon_view, vlc.Instance(["--no-disable-screensaver"]), self._resolve_video_path)
 
         self._setup_context_menu() # setup context menu for selecting monitors
+
+    def _resolve_video_path(self, path: Gtk.TreePath):
+        index = path.get_indices()[0]
+        if 0 <= index < len(self.video_paths):
+            return self.video_paths[index]
+        return None
 
     def reload_icon_view(self, *_):
         self.video_paths = get_video_paths()
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
-        self.icon_view: Gtk.IconView = self.builder.get_object("IconView")
         self.icon_view.set_pixbuf_column(0)
         self.icon_view.set_text_column(1)
         self.icon_view.set_model(list_store)
-        self.icon_view.connect("button-press-event", self.on_icon_view_button_press)
         for idx, video_path in enumerate(self.video_paths):
             pixbuf = Gtk.IconTheme().get_default().load_icon("video-x-generic", 96, 0)
             list_store.append([pixbuf, os.path.basename(video_path)])

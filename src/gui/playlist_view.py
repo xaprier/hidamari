@@ -4,6 +4,7 @@ import threading
 
 import gi
 import pydbus
+import vlc
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, GdkPixbuf, Gdk, Gio, Pango
@@ -17,11 +18,11 @@ try:
     import os
     sys.path.insert(1, os.path.join(sys.path[0], ".."))
     from gui.imports import *
-    from gui.gui_utils import get_thumbnail
+    from gui.gui_utils import get_thumbnail, HoverPreview
     from utils import ConfigUtil, PlaylistUtil, get_video_paths
 except ModuleNotFoundError:
     from hidamari.gui.imports import *
-    from hidamari.gui.gui_utils import get_thumbnail
+    from hidamari.gui.gui_utils import get_thumbnail, HoverPreview
     from hidamari.utils import ConfigUtil, PlaylistUtil, get_video_paths
 
 
@@ -110,6 +111,15 @@ class PlaylistView:
         self.playlist_scrolled_window.drag_dest_set(
             Gtk.DestDefaults.ALL, [DND_TARGET_VIDEO_INDEX], Gdk.DragAction.COPY)
         self.playlist_scrolled_window.connect("drag-data-received", self.on_playlist_drag_data_received)
+
+        # Hover preview: muted, looping playback of a video's thumbnail on hover,
+        # in both the library gallery and the playlist queue. Both share one VLC
+        # instance (cheap: it just hosts two independent players).
+        vlc_instance = vlc.Instance(["--no-disable-screensaver"])
+        self.videos_hover_preview = HoverPreview(
+            self.videos_view, vlc_instance, self._resolve_library_video_path)
+        self.playlist_hover_preview = HoverPreview(
+            self.playlist_icon_view, vlc_instance, self._resolve_queue_video_path)
 
         self._load_playlist()
         self._load_config()
@@ -597,6 +607,22 @@ class PlaylistView:
             self._update_playlist_view(monitor_name)
             self._update_disable_status_for_buttons()
         drag_context.finish(True, False, time)
+
+    def _resolve_library_video_path(self, path: Gtk.TreePath):
+        index = path.get_indices()[0]
+        video_paths = getattr(self, "video_paths", [])
+        if 0 <= index < len(video_paths):
+            return video_paths[index]
+        return None
+
+    def _resolve_queue_video_path(self, path: Gtk.TreePath):
+        model = self.playlist_icon_view.get_model()
+        if model is None:
+            return None
+        try:
+            return model[path][2]
+        except (IndexError, TypeError):
+            return None
 
     def _ellipsize_item_labels(self, icon_view: Gtk.IconView):
         """
