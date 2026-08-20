@@ -1,44 +1,52 @@
-import sys
 import logging
 import multiprocessing as mp
-import setproctitle
+import os
+import subprocess
+import sys
+from gettext import gettext as _
 
 # TODO: Port to Gtk4/adwaita someday...
 import gi
+import setproctitle
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gio, GLib
-
+from gi.repository import Gio, GLib, Gtk
 from pydbus import SessionBus
 
-try:
-    import os
-
-    sys.path.insert(1, os.path.join(sys.path[0], ".."))
-    from gui.web_view import WebView
-    from gui.local_video_view import LocalVideoView
-    from gui.streaming_view import StreamingView
-    from gui.playlist_view import PlaylistView
-    from gui.popover_main import PopoverMain
-    from commons import *
-    from monitor import *
-    from gui.gui_utils import debounce
-    from utils import ConfigUtil, setup_autostart, is_gnome, is_wayland, get_video_paths
-except ModuleNotFoundError:
-    from hidamari.monitor import *
-    from hidamari.commons import *
-    from hidamari.gui.web_view import WebView
-    from hidamari.gui.streaming_view import StreamingView
-    from hidamari.gui.local_video_view import LocalVideoView
-    from hidamari.gui.playlist_view import PlaylistView
-    from hidamari.gui.popover_main import PopoverMain
-    from hidamari.gui.gui_utils import debounce
-    from hidamari.utils import (
-        ConfigUtil,
-        setup_autostart,
-        is_gnome,
-        is_wayland,
-    )
+from hidamari.commons import (
+    AUTOSTART_DESKTOP_PATH,
+    CONFIG_KEY_BLUR_RADIUS,
+    CONFIG_KEY_FIRST_TIME,
+    CONFIG_KEY_MODE,
+    CONFIG_KEY_MUTE,
+    CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
+    CONFIG_KEY_STATIC_WALLPAPER,
+    CONFIG_KEY_VOLUME,
+    CONFIG_PATH,
+    DBUS_NAME_SERVER,
+    LOGGER_NAME,
+    MODE_PLAYLIST,
+    MODE_STREAM,
+    MODE_VIDEO,
+    MODE_WEBPAGE,
+    PROJECT,
+    TRANSLATION_DOMAIN,
+    VIDEO_WALLPAPER_DIR,
+)
+from hidamari.gui.gui_utils import debounce
+from hidamari.gui.local_video_view import LocalVideoView
+from hidamari.gui.playlist_view import PlaylistView
+from hidamari.gui.popover_main import PopoverMain
+from hidamari.gui.streaming_view import StreamingView
+from hidamari.gui.web_view import WebView
+from hidamari.utils import (
+    ConfigUtil,
+    init_translations,
+    is_gnome,
+    is_wayland,
+    setup_autostart,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(LOGGER_NAME)
@@ -49,7 +57,7 @@ APP_UI_RESOURCE_PATH = "/io/jeffshee/Hidamari/"
 
 class ControlPanel(Gtk.Application):
     def __init__(self, version, *args, **kwargs):
-        super(ControlPanel, self).__init__(
+        super().__init__(
             *args,
             application_id=APP_ID,
             flags=Gio.ApplicationFlags.FLAGS_NONE,
@@ -60,10 +68,11 @@ class ControlPanel(Gtk.Application):
         # Load main UI
         self.builder = Gtk.Builder()
         self.builder.set_application(self)
+        self.builder.set_translation_domain(TRANSLATION_DOMAIN)
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "control.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./src/assets/control.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/control.ui"))
 
         # Handlers declared in `control.ui`
         signals = {
@@ -147,9 +156,7 @@ class ControlPanel(Gtk.Application):
         actions = [
             (
                 "local_video_dir",
-                lambda *_: subprocess.run(
-                    ["xdg-open", os.path.realpath(VIDEO_WALLPAPER_DIR)]
-                ),
+                lambda *_: subprocess.run(["xdg-open", os.path.realpath(VIDEO_WALLPAPER_DIR)]),
             ),
             ("local_video_refresh", self.local_video.reload_icon_view),
             ("local_video_apply", self.local_video.on_local_video_apply),
@@ -213,16 +220,14 @@ class ControlPanel(Gtk.Application):
 
     def do_activate(self):
         if self.window is None:
-            self.window: Gtk.ApplicationWindow = self.builder.get_object(
-                "ApplicationWindow"
-            )
+            self.window: Gtk.ApplicationWindow = self.builder.get_object("ApplicationWindow")
             self.window.set_title("Hidamari")
             self.window.set_application(self)
             self.window.set_position(Gtk.WindowPosition.CENTER)
         self.window.present()
 
         if self.server is None:
-            self._show_error("Couldn't connect to server")
+            self._show_error(_("Couldn't connect to server"))
 
         if self.config[CONFIG_KEY_FIRST_TIME]:
             self._show_welcome()
@@ -235,10 +240,15 @@ class ControlPanel(Gtk.Application):
             parent=self.window,
             modal=True,
             destroy_with_parent=True,
-            text="Welcome to Hidamari 🤗",
+            text=_("Welcome to Hidamari 🤗"),
             message_type=Gtk.MessageType.INFO,
             #    secondary_text="You can bring up the Menu by <b>Right click</b> on the desktop",
-            secondary_text="Quickstart for adding local videos:\n ・Click the folder icon to open the Hidamari folder\n ・Put your videos there\n ・Click the refresh button",
+            secondary_text=_(
+                "Quickstart for adding local videos:\n"
+                " ・Click the folder icon to open the Hidamari folder\n"
+                " ・Put your videos there\n"
+                " ・Click the refresh button"
+            ),
             secondary_use_markup=True,
             buttons=Gtk.ButtonsType.OK,
         )
@@ -250,7 +260,7 @@ class ControlPanel(Gtk.Application):
             parent=self.window,
             modal=True,
             destroy_with_parent=True,
-            text="Oops!",
+            text=_("Oops!"),
             message_type=Gtk.MessageType.ERROR,
             secondary_text=error,
             buttons=Gtk.ButtonsType.OK,
@@ -315,17 +325,25 @@ class ControlPanel(Gtk.Application):
         toggle_mute: Gtk.ToggleButton = self.popover_main.builder.get_object("ToggleAutostart")
         toggle_mute.set_state = self.is_autostart
 
+def _find_gresource(pkgdatadir):
+    """Locate hidamari.gresource: the launcher-provided prefix first, then the
+    standard XDG data dirs (so `python -m hidamari` works for any install)."""
+    candidates = [os.path.join(pkgdatadir, "hidamari.gresource")]
+    candidates += [
+        os.path.join(d, "hidamari", "hidamari.gresource")
+        for d in (GLib.get_user_data_dir(), *GLib.get_system_data_dirs())
+    ]
+    return next((c for c in candidates if os.path.isfile(c)), None)
 
-def main(
-    version="devel", pkgdatadir="/app/share/hidamari", localedir="/app/share/locale"
-):
-    try:
-        resource = Gio.Resource.load(os.path.join(pkgdatadir, "hidamari.gresource"))
-        resource._register()
-        icon_theme = Gtk.IconTheme.get_default()
-        icon_theme.add_resource_path("/io/jeffshee/Hidamari/icons")
-    except GLib.Error:
-        logger.error("[GUI/ControlPanel] Couldn't load resource")
+
+def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/share/locale"):
+    init_translations(localedir)
+    gresource = _find_gresource(pkgdatadir)
+    if gresource is None:
+        logger.error("[GUI] Couldn't find hidamari.gresource. Is Hidamari installed?")
+        return
+    Gio.Resource.load(gresource)._register()
+    Gtk.IconTheme.get_default().add_resource_path("/io/jeffshee/Hidamari/icons")
 
     app = ControlPanel(version)
     app.run(sys.argv)

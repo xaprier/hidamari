@@ -1,64 +1,92 @@
-import os
-import sys
 import logging
+import os
+import subprocess
+import tempfile
 import threading
 
 import gi
 import vlc
+
 gi.require_version("GnomeDesktop", "4.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gio, GnomeDesktop, GdkPixbuf, Gtk, Gdk, GLib
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GnomeDesktop, Gtk
 
-try:
-    import os
-    sys.path.insert(1, os.path.join(sys.path[0], '..'))
-    from commons import *
-except ModuleNotFoundError:
-    from hidamari.commons import *
+from hidamari.commons import LOGGER_NAME
+from hidamari.utils import is_flatpak
 
 logger = logging.getLogger(LOGGER_NAME)
 
 
+def _generate_thumbnail_flatpak(filename):
+    # Inside Flatpak, DesktopThumbnailFactory runs the thumbnailer via
+    # `flatpak-spawn --sandbox`, where glycin (which writes the PNG on
+    # recent GNOME runtimes) can't spawn its own sandboxed loader — nested
+    # sandboxes are blocked, so every thumbnail fails. Run the bundled
+    # thumbnailer directly instead; glycin's single-level sandbox then
+    # works via the org.freedesktop.Flatpak portal.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        output = os.path.join(tmp_dir, "thumbnail.png")
+        subprocess.run(
+            ["totem-video-thumbnailer", "-s", "256", filename, output],
+            check=True,
+            timeout=60,
+        )
+        return GdkPixbuf.Pixbuf.new_from_file(output)
+
+
 def generate_thumbnail(filename):
+    """Generate and cache a thumbnail. Returns its path, or None if one can't
+    be produced (e.g. no usable thumbnailer, or it failed)."""
     factory = GnomeDesktop.DesktopThumbnailFactory()
     mtime = os.path.getmtime(filename)
     file = Gio.file_new_for_path(filename)
     uri = file.get_uri()
-    info = file.query_info("standard::content-type",
-                           Gio.FileQueryInfoFlags.NONE, None)
+    info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
     mime_type = info.get_content_type()
 
-    if factory.lookup(uri, mtime) is not None:
-        return False
+    cached = factory.lookup(uri, mtime)
+    if cached is not None:
+        return cached
 
     if not factory.can_thumbnail(uri, mime_type, mtime):
-        return False
+        return None
 
-    thumbnail = factory.generate_thumbnail(uri, mime_type)
-    if thumbnail is None:
-        return False
+    if is_flatpak():
+        pixbuf = _generate_thumbnail_flatpak(filename)
+    else:
+        pixbuf = factory.generate_thumbnail(uri, mime_type)
+    if pixbuf is None:
+        return None
 
-    factory.save_thumbnail(thumbnail, uri, mtime)
-    return True
+    factory.save_thumbnail(pixbuf, uri, mtime)
+    return factory.lookup(uri, mtime)
 
 
 def get_thumbnail(video_path, list_store, idx):
-    file = Gio.File.new_for_path(video_path)
-    info = file.query_info("*", Gio.FileQueryInfoFlags.NONE, None)
-    thumbnail = info.get_attribute_byte_string("thumbnail::path")
-    if thumbnail is not None or generate_thumbnail(video_path):
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(thumbnail, -1, 96)
-        list_store[idx][0] = pixbuf
+    # Best-effort: a preview thumbnail must never crash the GUI. On failure the
+    # generic video icon set by the caller stays in place. (In the Flatpak the
+    # sandboxed thumbnailer can fail; that's fine, we just skip the preview.)
+    try:
+        info = Gio.File.new_for_path(video_path).query_info(
+            "thumbnail::path", Gio.FileQueryInfoFlags.NONE, None
+        )
+        thumbnail = info.get_attribute_byte_string("thumbnail::path") or generate_thumbnail(
+            video_path
+        )
+        if thumbnail:
+            list_store[idx][0] = GdkPixbuf.Pixbuf.new_from_file_at_size(thumbnail, -1, 96)
+    except (GLib.Error, OSError, subprocess.SubprocessError) as e:
+        logger.debug("[Thumbnail] Skipped %s: %s", os.path.basename(video_path), e)
 
 
 def debounce(wait_time):
     """
     Decorator that will debounce a function so that it is called after wait_time seconds
     If it is called multiple times, will wait for the last call to be debounced and run only this one.
-    See the test_debounce.py file for examples
     Reference:
     https://github.com/salesforce/decorator-operations/blob/master/decoratorOperations/debounce_functions/debounce.py
     """
+
     def decorator(function):
         def debounced(*args, **kwargs):
             def call_function():
