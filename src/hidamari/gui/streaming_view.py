@@ -8,7 +8,6 @@ try:
     from utils import ConfigUtil
 except ModuleNotFoundError:
     from hidamari.gui.imports import *
-    from hidamari.server import HidamariServer
     from hidamari.utils import ConfigUtil
 
 class StreamingView:
