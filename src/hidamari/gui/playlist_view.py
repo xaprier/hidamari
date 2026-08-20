@@ -34,7 +34,7 @@ class PlaylistView:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "playlist_view.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./src/assets/playlist_view.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/playlist_view.ui"))
 
         self.widget = self.builder.get_object("PlaylistView")
         

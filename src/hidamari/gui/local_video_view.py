@@ -26,7 +26,7 @@ class LocalVideoView:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "local_video_view.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./src/assets/local_video_view.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/local_video_view.ui"))
 
         self.widget = self.builder.get_object("LocalVideoView")
 

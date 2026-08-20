@@ -20,7 +20,7 @@ class AboutDialog:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "about_dialog.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./assets/about_dialog.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/about_dialog.ui"))
 
         self.dialog: Gtk.AboutDialog = self.builder.get_object("AboutDialog")
         

@@ -19,7 +19,7 @@ class PopoverMain:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "popover_main.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./src/assets/popover_main.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/popover_main.ui"))
 
         self.widget = self.builder.get_object("PopoverMain")
 

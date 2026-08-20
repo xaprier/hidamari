@@ -19,7 +19,7 @@ class StreamingView:
         try:
             self.builder.add_from_resource(APP_UI_RESOURCE_PATH + "streaming_view.ui")
         except GLib.Error:
-            self.builder.add_from_file(os.path.abspath("./src/assets/streaming_view.ui"))
+            self.builder.add_from_file(os.path.abspath("./src/hidamari/assets/streaming_view.ui"))
 
         self.widget = self.builder.get_object("StreamingView")
 
